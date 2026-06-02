@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Админ-панель - Конфигуратор щитового оборудования</title>
+    
+    <!-- Фавиконка -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%233b82f6'/><text y='.78em' x='50%25' text-anchor='middle' font-size='60' font-weight='bold'>⚡</text></svg>">
+    <link rel="stylesheet" href="css/style.css">
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Загрузчик -->
+    <div id="loading" class="loading" style="display: none">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Доступ запрещён -->
+    <div id="accessDenied" style="display: none">
+        <div class="access-denied-container">
+            <div class="access-denied">
+                <i class="fas fa-lock"></i>
+                <h2>Доступ запрещен</h2>
+                <p id="accessDeniedMessage">У вас нет прав администратора для просмотра этой страницы.</p>
+                <button onclick="window.location.href = '/'" class="btn btn-primary">
+                    <i class="fas fa-home"></i> Вернуться на главную
+                </button>
+            </div>
+        </div>
+    </div>
+     <!-- Модальное окно просмотра заказа -->
+    <div class="modal" id="viewOrderModal">
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h2><i class="fas fa-file-invoice"></i> Детали заказа</h2>
+                <span class="close" onclick="closeViewOrderModal()">&times;</span>
+            </div>
+            <div id="viewOrderContent" class="modal-body" style="max-height: 60vh; overflow-y: auto;"></div>
+            <div class="modal-footer">
+                <button class="btn btn-warning" onclick="closeViewOrderModal(); editOrder(currentOrderId);" style="background: #f59e0b; color: white;">
+                    <i class="fas fa-edit"></i> Редактировать
+                </button>
+                <button class="btn btn-danger" onclick="closeViewOrderModal(); confirmDeleteOrder(currentOrderId, currentOrderNumber);">
+                    <i class="fas fa-trash-alt"></i> Удалить
+                </button>
+                <button class="btn btn-secondary" onclick="closeViewOrderModal()">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно редактирования заказа -->
+    <div class="modal" id="editOrderModal">
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h2><i class="fas fa-edit"></i> Редактирование заказа <span id="editOrderNumber"></span></h2>
+                <span class="close" onclick="closeEditOrderModal()">&times;</span>
+            </div>
+            <div class="modal-body" style="max-height: 60vh; overflow-y: auto;">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label><i class="fas fa-user"></i> Имя клиента *</label>
+                        <input type="text" id="editCustomerName" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-phone"></i> Телефон</label>
+                        <input type="tel" id="editCustomerPhone" class="form-control">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label><i class="fas fa-envelope"></i> Email</label>
+                        <input type="email" id="editCustomerEmail" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-map-marker-alt"></i> Адрес</label>
+                        <input type="text" id="editCustomerAddress" class="form-control">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label><i class="fas fa-truck"></i> Способ доставки</label>
+                        <select id="editDeliveryMethod" class="form-control">
+                            <option value="pickup">Самовывоз</option>
+                            <option value="delivery">Доставка</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-location-dot"></i> Адрес доставки</label>
+                        <input type="text" id="editDeliveryAddress" class="form-control">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label><i class="fas fa-credit-card"></i> Способ оплаты</label>
+                        <select id="editPaymentMethod" class="form-control">
+                            <option value="cash">Наличные</option>
+                            <option value="card">Карта</option>
+                            <option value="invoice">По счету</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-tag"></i> Статус</label>
+                        <select id="editStatus" class="form-control">
+                            <option value="new">Новый</option>
+                            <option value="processing">В обработке</option>
+                            <option value="confirmed">Подтвержден</option>
+                            <option value="manufacturing">В производстве</option>
+                            <option value="ready">Готов</option>
+                            <option value="delivered">Доставлен</option>
+                            <option value="completed">Выполнен</option>
+                            <option value="cancelled">Отменен</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-comment"></i> Комментарий клиента</label>
+                    <textarea id="editComments" rows="2" class="form-control"></textarea>
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-comment-dots"></i> Комментарий менеджера</label>
+                    <textarea id="editManagerComments" rows="2" class="form-control"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeEditOrderModal()">Отмена</button>
+                <button class="btn btn-primary" onclick="saveOrderChanges()">
+                    <i class="fas fa-save"></i> Сохранить изменения
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно изменения статуса -->
+    <div class="modal" id="statusModal">
+        <div class="modal-content small">
+            <div class="modal-header">
+                <h2><i class="fas fa-sync-alt"></i> Изменение статуса</h2>
+                <span class="close" onclick="closeStatusModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div style="background: var(--bg-panel); padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                        <span>Заказ:</span>
+                        <strong id="statusOrderNumber"></strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Текущий статус:</span>
+                        <span id="currentStatusDisplay"></span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-exchange-alt"></i> Новый статус</label>
+                    <select id="newStatus" class="form-control">
+                        <option value="new">Новый</option>
+                        <option value="processing">В обработке</option>
+                        <option value="confirmed">Подтвержден</option>
+                        <option value="manufacturing">В производстве</option>
+                        <option value="ready">Готов</option>
+                        <option value="delivered">Доставлен</option>
+                        <option value="completed">Выполнен</option>
+                        <option value="cancelled">Отменен</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-comment"></i> Комментарий</label>
+                    <textarea id="statusComment" rows="3" class="form-control" placeholder="Причина изменения статуса..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeStatusModal()">Отмена</button>
+                <button class="btn btn-primary" onclick="saveStatusChange()">
+                    <i class="fas fa-save"></i> Сохранить
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно подтверждения удаления заказа -->
+    <div class="modal" id="deleteOrderModal">
+        <div class="modal-content small">
+            <div class="modal-header" style="background: rgba(239, 68, 68, 0.1);">
+                <h2><i class="fas fa-exclamation-triangle" style="color: #ef4444;"></i> Подтверждение удаления</h2>
+                <span class="close" onclick="closeDeleteOrderModal()">&times;</span>
+            </div>
+            <div class="modal-body text-center">
+                <i class="fas fa-trash-alt" style="font-size: 48px; color: #ef4444; margin-bottom: 20px;"></i>
+                <p>Вы уверены, что хотите отменить заказ <strong id="deleteOrderNumber"></strong>?</p>
+                <p class="text-muted" style="font-size: 0.85rem;">После отмены заказ будет иметь статус "Отменён"</p>
+                <div class="form-group" style="margin-top: 20px;">
+                    <label><i class="fas fa-comment"></i> Причина отмены</label>
+                    <textarea id="deleteOrderReason" rows="3" class="form-control" placeholder="Укажите причину отмены заказа..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeDeleteOrderModal()">
+                    <i class="fas fa-times"></i> Назад
+                </button>
+                <button class="btn btn-danger" onclick="confirmDeleteOrderAction()">
+                    <i class="fas fa-trash-alt"></i> Отменить заказ
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Основной контент -->
+    <div id="adminContent" style="display: none">
+        <div class="admin-container">
+            
+            <!-- Шапка -->
+            <div class="admin-header">
+                <h1><i class="fas fa-cog"></i> Админ-панель</h1>
+                <div class="user-info">
+                    <span><i class="fas fa-user"></i> <span id="userName">Загрузка...</span></span>
+                    <span class="role-badge" id="userRole">...</span>
+                    <a href="/admin-dashboard.html" class="btn-analytics">
+                        <i class="fas fa-chart-line"></i> Аналитика
+                    </a>
+                    <button class="logout-btn" onclick="logout()">
+                        <i class="fas fa-sign-out-alt"></i> Выйти
+                    </button>
+                </div>
+            </div>
+
+            <!-- Статистика -->
+            <div class="stats-grid">
+                <div class="stat-card orders">
+                    <div class="label">Всего заказов</div>
+                    <div class="value" id="totalOrders">0</div>
+                </div>
+                <div class="stat-card new">
+                    <div class="label">Новые заказы</div>
+                    <div class="value" id="newOrders">0</div>
+                </div>
+                <div class="stat-card components">
+                    <div class="label">Компонентов</div>
+                    <div class="value" id="totalComponents">0</div>
+                </div>
+                <div class="stat-card categories">
+                    <div class="label">Категорий</div>
+                    <div class="value" id="totalCategories">0</div>
+                </div>
+            </div>
+
+            <!-- Кнопки экспорта -->
+            <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap">
+                <button class="btn btn-success btn-small" onclick="exportOrders()"><i class="fas fa-file-excel"></i> Заказы</button>
+                <button class="btn btn-success btn-small" onclick="exportComponents()"><i class="fas fa-file-excel"></i> Компоненты</button>
+                <button class="btn btn-success btn-small" onclick="exportCategories()"><i class="fas fa-file-excel"></i> Категории</button>
+                <button class="btn btn-success btn-small" onclick="exportUsers()"><i class="fas fa-file-excel"></i> Пользователи</button>
+                <button class="btn btn-primary btn-small" onclick="exportAllTables()"><i class="fas fa-file-excel"></i> Все таблицы</button>
+            </div>
+
+            <!-- Вкладки -->
+            <div class="tabs">
+                <div class="tab active" onclick="showTab('orders')"><i class="fas fa-clipboard-list"></i> Заказы</div>
+                <div class="tab" onclick="showTab('components')"><i class="fas fa-microchip"></i> Компоненты</div>
+                <div class="tab" onclick="showTab('categories')"><i class="fas fa-folder"></i> Категории</div>
+                <div class="tab" onclick="showTab('users')"><i class="fas fa-users"></i> Пользователи</div>
+            </div>
+
+            <!-- Вкладка Заказы -->
+            <div id="tab-orders" class="tab-content active">
+                <div class="panel-section">
+                    <h3><i class="fas fa-clipboard-list"></i> Управление заказами</h3>
+                    <div class="search-box">
+                        <input type="text" id="searchOrders" class="search-input" placeholder="Поиск по номеру, клиенту...">
+                        <i class="fas fa-search search-icon"></i>
+                    </div>
+                    <div class="table-container">
+                        <table class="table">
+                            <thead>
+                                <tr><th>№</th><th>Клиент</th><th>Дата</th><th>Статус</th><th>Сумма</th><th>Действия</th></tr>
+                            </thead>
+                            <tbody id="ordersTable">
+                                <tr><td colspan="6" class="empty-message">Загрузка...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Вкладка Компоненты -->
+            <div id="tab-components" class="tab-content">
+                <div class="admin-panel">
+                    <div class="panel-section">
+                        <h3><i class="fas fa-plus-circle"></i> Добавить компонент</h3>
+                        <form id="addComponentForm">
+                            <div class="form-group">
+                                <label><i class="fas fa-tag"></i> Название *</label>
+                                <input type="text" id="compName" required placeholder="Введите название компонента">
+                            </div>
+                            <div class="form-group">
+                                <label><i class="fas fa-align-left"></i> Описание</label>
+                                <textarea id="compDescription" rows="3" placeholder="Описание компонента..."></textarea>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label><i class="fas fa-ruble-sign"></i> Цена *</label>
+                                    <input type="number" id="compPrice" step="0.01" required placeholder="0.00">
+                                </div>
+                                <div class="form-group">
+                                    <label><i class="fas fa-folder"></i> Категория</label>
+                                    <select id="compCategory"><option value="">Без категории</option></select>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label><i class="fas fa-industry"></i> Производитель</label>
+                                    <input type="text" id="compManufacturer" placeholder="Например: ABB">
+                                </div>
+                                <div class="form-group">
+                                    <label><i class="fas fa-bolt"></i> Мощность</label>
+                                    <input type="text" id="compPower" placeholder="Например: 250А">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label><i class="fas fa-battery-full"></i> Напряжение</label>
+                                    <input type="text" id="compVoltage" placeholder="Например: 380В">
+                                </div>
+                                <div class="form-group">
+                                    <label style="display: flex; align-items: center; gap: 10px">
+                                        <input type="checkbox" id="compInStock" checked style="width: auto">
+                                        <i class="fas fa-check-circle"></i> В наличии
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label><i class="fas fa-image"></i> Изображение компонента</label>
+                                <input type="file" id="compImage" accept="image/*" style="padding: 10px; border: 2px dashed var(--border-color); border-radius: 10px; width: 100%; cursor: pointer;">
+                                <small style="color: var(--text-muted); display: block; margin-top: 5px;">Поддерживаются: JPEG, PNG, GIF, WebP. Максимальный размер: 5 МБ</small>
+                                <div id="compImagePreview" style="margin-top: 12px;"></div>
+                            </div>
+                            <button type="submit" class="btn btn-success btn-block"><i class="fas fa-plus"></i> Добавить компонент</button>
+                        </form>
+                    </div>
+                    
+                    <div class="panel-section">
+                        <h3><i class="fas fa-cubes"></i> Список компонентов</h3>
+                        <div class="search-box">
+                            <input type="text" id="searchComponents" class="search-input" placeholder="Поиск компонентов...">
+                            <i class="fas fa-search search-icon"></i>
+                        </div>
+                        <div class="table-container">
+                            <table class="table">
+                                <thead>
+                                    <tr><th>ID</th><th>Название</th><th>Цена</th><th>Категория</th><th>Наличие</th><th>Фото</th><th>Действия</th></tr>
+                                </thead>
+                                <tbody id="componentsTable">
+                                    <tr><td colspan="7" class="empty-message">Загрузка...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Вкладка Категории -->
+            <div id="tab-categories" class="tab-content">
+                <div class="admin-panel">
+                    <div class="panel-section">
+                        <h3><i class="fas fa-folder-plus"></i> Добавить категорию</h3>
+                        <form id="addCategoryForm">
+                            <div class="form-group">
+                                <label><i class="fas fa-tag"></i> Название *</label>
+                                <input type="text" id="catName" required placeholder="Введите название категории">
+                            </div>
+                            <div class="form-group">
+                                <label><i class="fas fa-align-left"></i> Описание</label>
+                                <textarea id="catDescription" rows="4" placeholder="Описание категории..."></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-success btn-block"><i class="fas fa-plus"></i> Добавить категорию</button>
+                        </form>
+                    </div>
+                    
+                    <div class="panel-section">
+                        <h3><i class="fas fa-folder"></i> Список категорий</h3>
+                        <div class="search-box">
+                            <input type="text" id="searchCategories" class="search-input" placeholder="Поиск категорий...">
+                            <i class="fas fa-search search-icon"></i>
+                        </div>
+                        <div class="table-container">
+                            <table class="table">
+                                <thead>
+                                    <tr><th>ID</th><th>Название</th><th>Описание</th><th>Действия</th></tr>
+                                </thead>
+                                <tbody id="categoriesTable">
+                                    <tr><td colspan="4" class="empty-message">Загрузка...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Вкладка Пользователи -->
+            <div id="tab-users" class="tab-content">
+                <div class="panel-section">
+                    <h3><i class="fas fa-users"></i> Управление пользователями</h3>
+                    <div class="search-box">
+                        <input type="text" id="searchUsers" class="search-input" placeholder="Поиск пользователей...">
+                        <i class="fas fa-search search-icon"></i>
+                    </div>
+                    <div class="table-container">
+                        <table class="table">
+                            <thead>
+                                <tr><th>ID</th><th>Логин</th><th>Имя</th><th>Email</th><th>Роль</th><th>Статус</th><th>Действия</th></tr>
+                            </thead>
+                            <tbody id="usersTable">
+                                <tr><td colspan="7" class="empty-message">Загрузка...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Модальное окно: Редактирование пользователя -->
+<div class="modal" id="editUserModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2><i class="fas fa-user-edit"></i> Редактировать пользователя</h2>
+            <span class="close" onclick="closeEditUserModal()">&times;</span>
+        </div>
+        <form id="editUserForm">
+            <input type="hidden" id="editUserId">
+            <div class="form-group">
+                <label><i class="fas fa-user"></i> ФИО *</label>
+                <input type="text" id="editUserFullName" required>
+            </div>
+            <div class="form-group">
+                <label><i class="fas fa-envelope"></i> Email *</label>
+                <input type="email" id="editUserEmail" required>
+            </div>
+            <div class="form-group">
+                <label><i class="fas fa-phone"></i> Телефон</label>
+                <input type="tel" id="editUserPhone">
+            </div>
+            <div class="form-group">
+                <label><i class="fas fa-shield-alt"></i> Роль</label>
+                <select id="editUserRole">
+                    <option value="user">Пользователь</option>
+                    <option value="manager">Менеджер</option>
+                    <option value="admin">Администратор</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label><i class="fas fa-key"></i> Новый пароль (оставьте пустым, чтобы не менять)</label>
+                <input type="password" id="editUserPassword" placeholder="Минимум 6 символов">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeEditUserModal()">Отмена</button>
+                <button type="submit" class="btn btn-primary">Сохранить</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+    <!-- Модальное окно: Редактирование компонента -->
+    <div class="modal" id="editComponentModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-edit"></i> Редактировать компонент</h2>
+                <span class="close" onclick="closeEditComponentModal()">&times;</span>
+            </div>
+            <form id="editComponentForm">
+                <input type="hidden" id="editCompId">
+                <div class="form-group">
+                    <label><i class="fas fa-tag"></i> Название *</label>
+                    <input type="text" id="editCompName" required>
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-align-left"></i> Описание</label>
+                    <textarea id="editCompDescription" rows="3"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label><i class="fas fa-ruble-sign"></i> Цена *</label>
+                        <input type="number" id="editCompPrice" step="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-folder"></i> Категория</label>
+                        <select id="editCompCategory"><option value="">Без категории</option></select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label><i class="fas fa-industry"></i> Производитель</label>
+                        <input type="text" id="editCompManufacturer">
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-bolt"></i> Мощность</label>
+                        <input type="text" id="editCompPower">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label><i class="fas fa-battery-full"></i> Напряжение</label>
+                        <input type="text" id="editCompVoltage">
+                    </div>
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; gap: 10px">
+                            <input type="checkbox" id="editCompInStock">
+                            <i class="fas fa-check-circle"></i> В наличии
+                        </label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-image"></i> Изображение</label>
+                    <input type="file" id="editCompImage" accept="image/*" style="padding: 10px; border: 2px dashed var(--border-color); border-radius: 10px; width: 100%; cursor: pointer;">
+                    <small style="color: var(--text-muted); display: block; margin-top: 5px;">JPEG, PNG, GIF, WebP до 5MB</small>
+                    <div id="currentCompImage" style="margin-top: 10px;"></div>
+                    <div id="editCompImagePreview" style="margin-top: 10px;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeEditComponentModal()">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Модальное окно: Редактирование категории -->
+    <div class="modal" id="editCategoryModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-edit"></i> Редактировать категорию</h2>
+                <span class="close" onclick="closeEditCategoryModal()">&times;</span>
+            </div>
+            <form id="editCategoryForm">
+                <input type="hidden" id="editCatId">
+                <div class="form-group">
+                    <label><i class="fas fa-tag"></i> Название *</label>
+                    <input type="text" id="editCatName" required>
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-align-left"></i> Описание</label>
+                    <textarea id="editCatDescription" rows="4"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeEditCategoryModal()">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Модальное окно: Подтверждение удаления -->
+    <div class="modal" id="deleteConfirmModal">
+        <div class="modal-content small">
+            <div class="modal-header">
+                <h2><i class="fas fa-exclamation-triangle" style="color:#e74c3c"></i> Подтверждение удаления</h2>
+                <span class="close" onclick="closeDeleteModal()">&times;</span>
+            </div>
+            <div style="text-align:center;padding:20px">
+                <i class="fas fa-trash-alt" style="font-size:4rem;color:#e74c3c;margin-bottom:20px"></i>
+                <p id="deleteMessage" style="margin-bottom:20px;font-size:1.1rem">Вы уверены?</p>
+            </div>
+            <div class="modal-footer" style="justify-content:center">
+                <button class="btn btn-secondary" onclick="closeDeleteModal()">Отмена</button>
+                <button class="btn btn-danger" id="confirmDeleteBtn">Удалить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно: Изменение статуса -->
+    <div class="modal" id="statusModal">
+        <div class="modal-content small">
+            <div class="modal-header">
+                <h2><i class="fas fa-sync-alt"></i> Изменение статуса</h2>
+                <span class="close" onclick="closeStatusModal()">&times;</span>
+            </div>
+            <div class="modal-body" style="padding: 0 30px 30px;">
+                <div style="background:var(--bg-panel);padding:15px;border-radius:10px;margin-bottom:20px">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:10px">
+                        <span>Заказ:</span>
+                        <span id="statusOrderNumber"></span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between">
+                        <span>Текущий статус:</span>
+                        <span id="currentStatusDisplay" class="status-badge status-new"></span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Новый статус</label>
+                    <select id="newStatus">
+                        <option value="new">Новый</option>
+                        <option value="processing">В обработке</option>
+                        <option value="confirmed">Подтвержден</option>
+                        <option value="manufacturing">В производстве</option>
+                        <option value="ready">Готов</option>
+                        <option value="delivered">Доставлен</option>
+                        <option value="completed">Выполнен</option>
+                        <option value="cancelled">Отменен</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Комментарий</label>
+                    <textarea id="statusComment" rows="3" placeholder="Причина изменения..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeStatusModal()">Отмена</button>
+                <button class="btn btn-primary" onclick="saveStatusChange()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Скрипты -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="js/export-all.js"></script>
+    <script src="js/admin.js"></script>
+    
+    <!-- Кнопка темы создаётся в admin.js -->
+</body>
+</html>
